@@ -1,0 +1,41 @@
+#!/bin/bash
+
+set -e
+
+IMAGE=$1
+ARCH=$2
+SINGARCH=$3
+DEFURL=$4
+OUTNAME=$5
+TARBALL=$6
+
+OUTLOG=out/logs/$ARCH/$IMAGE.log
+
+# make sure we keep cache in the local dir
+export TMPDIR=$PWD/tmp
+export APPTAINER_CACHEDIR=$PWD/tmp/apptainer
+export SINGULARITY_CACHEDIR=$PWD/tmp/apptainer
+mkdir -p $APPTAINER_CACHEDIR
+
+# create an empty tarball to start with
+mkdir -p out/logs/$ARCH out/$ARCH/$IMAGE
+(cd out && tar czf ../$TARBALL .)
+
+# control the builds
+export GNUMAKEFLAGS=-j1
+
+# grab the def file
+curl -o container.def "$DEFURL"
+
+RC=0
+echo "\$ apptainer build out/$ARCH/$IMAGE/$OUTNAME container.def" >>$OUTLOG
+if ! (apptainer build out/$ARCH/$IMAGE/$OUTNAME container.def >>$OUTLOG 2>&1); then
+    RC=$?
+fi
+cat $OUTLOG
+
+# update output tarball
+(cd out && tar czf ../$TARBALL .)
+
+exit $RC
+

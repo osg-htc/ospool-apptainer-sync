@@ -1,0 +1,31 @@
+#!/bin/bash
+
+set -e 
+
+REPODIR=$1
+IMAGE=$2
+ARCH=$3
+OUTNAME=$4
+TAR=$5
+
+TOPDIR=$PWD
+
+ls -la
+
+echo
+echo
+
+# install the new image
+cd $REPODIR
+tar xzvf $TOPDIR/$TAR
+
+cp logs/$ARCH/$IMAGE.log $TOPDIR/$IMAGE-$ARCH.log
+
+cd $REPODIR/$ARCH/$IMAGE
+
+# updated latest
+ls *.sif | sort | tail -n 1 > latest.txt
+
+# cleanup
+find . -maxdepth 1 -name \*.sif -mtime +10 -exec rm -f {} \;
+

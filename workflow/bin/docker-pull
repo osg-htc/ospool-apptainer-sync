@@ -1,0 +1,56 @@
+#!/bin/bash
+
+set -e
+
+IMAGE=$1
+ARCH=$2
+SINGARCH=$3
+DOCKERIMAGE=$4
+OUTNAME=$5
+TARBALL=$6
+
+OUTLOG=out/logs/$ARCH/$IMAGE.log
+
+# make sure we keep cache in the local dir
+export TMPDIR=$PWD/tmp
+export APPTAINER_CACHEDIR=$PWD/tmp/apptainer
+export SINGULARITY_CACHEDIR=$PWD/tmp/apptainer
+mkdir -p $APPTAINER_CACHEDIR
+
+# create an empty tarball to start with
+mkdir -p out/logs/$ARCH out/$ARCH/$IMAGE
+(cd out && tar czf ../$TARBALL .)
+
+# control the builds
+export GNUMAKEFLAGS=-j1
+
+RC=0
+echo "\$ apptainer pull --arch $SINGARCH out/$ARCH/$IMAGE/$OUTNAME docker://$DOCKERIMAGE" >>$OUTLOG
+if ! (apptainer pull --arch $SINGARCH out/$ARCH/$IMAGE/$OUTNAME docker://$DOCKERIMAGE >>$OUTLOG 2>&1); then
+    RC=$?
+fi
+cat $OUTLOG
+
+apptainer cache clean -f >/dev/null 2>&1
+
+if [[ $RC == 0 ]]; then
+    echo
+    echo
+    IMGARCH=$(apptainer sif header out/$ARCH/$IMAGE/$OUTNAME | grep "Primary Architecture:" | sed 's/.*: //')
+    echo "Checking arch... ($IMGARCH == $SINGARCH)"
+    if (echo $IMGARCH | grep $SINGARCH); then
+        echo " ... Ok"
+    else
+        echo "Wrong architechture: $IMGARCH. Ignoring this image." >>$OUTLOG
+        echo " ... Fail! Removing image."
+        rm -f out/$ARCH/$IMAGE/$OUTNAME
+    fi
+else
+    rm -f out/$ARCH/$IMAGE/$OUTNAME
+fi
+
+# update output tarball
+(cd out && tar czf ../$TARBALL .)
+
+exit $RC
+
